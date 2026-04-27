@@ -34,7 +34,7 @@ export class ScraperService {
 
       return details;
     } catch (error) {
-      logger.error("Scraping error:", error);
+      logger.error({ err: error }, "Scraping error:");
       throw error;
     } finally {
       await page.close();
@@ -55,7 +55,7 @@ export class ScraperService {
       logger.info(`Auto-submit not fully implemented for generic URL: ${url}`);
       return false;
     } catch (error) {
-      logger.error("Auto-submit error:", error);
+      logger.error({ err: error }, "Auto-submit error:");
       return false;
     } finally {
       await page.close();

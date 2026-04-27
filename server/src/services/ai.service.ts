@@ -68,7 +68,7 @@ export class AIService {
       const jsonStr = text.replace(/```json|```/g, "").trim();
       return JSON.parse(jsonStr) as ParsedCV;
     } catch (error) {
-      logger.error("Error parsing CV with Gemini:", error);
+      logger.error({ err: error }, "Error parsing CV with Gemini:");
       throw new Error("Failed to parse CV");
     }
   }
@@ -106,7 +106,7 @@ export class AIService {
       const jsonStr = text.replace(/```json|```/g, "").trim();
       return JSON.parse(jsonStr) as MatchResult;
     } catch (error) {
-      logger.error("Error matching job with Gemini:", error);
+      logger.error({ err: error }, "Error matching job with Gemini:");
       return { score: 0, reasoning: "Error during match analysis" };
     }
   }
@@ -134,7 +134,7 @@ export class AIService {
       const response = await result.response;
       return { coverLetter: response.text().trim() };
     } catch (error) {
-      logger.error("Error tailoring application with Gemini:", error);
+      logger.error({ err: error }, "Error tailoring application with Gemini:");
       throw new Error("Failed to tailor application");
     }
   }

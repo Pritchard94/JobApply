@@ -34,7 +34,7 @@ export const jobSearchWorker = new Worker(
       .select();
 
     if (upsertError) {
-      logger.error("Error upserting jobs:", upsertError);
+      logger.error({ err: upsertError }, "Error upserting jobs:");
       return;
     }
 

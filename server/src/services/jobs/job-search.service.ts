@@ -47,7 +47,7 @@ export class JobSearchService {
           try {
             return await adapter.search(options);
           } catch (error) {
-            logger.error(`Adapter ${adapter.sourceName} failed:`, error);
+            logger.error({ err: error }, `Adapter ${adapter.sourceName} failed:`);
             return [];
           }
         })

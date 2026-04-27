@@ -48,7 +48,7 @@ export class JSearchAdapter implements JobAdapter {
         raw_data: job,
       }));
     } catch (error) {
-      logger.error("JSearch adapter error:", error);
+      logger.error({ err: error }, "JSearch adapter error:");
       return [];
     }
   }

@@ -73,7 +73,7 @@ export const cvParseWorker = new Worker(
 
       logger.info(`Successfully parsed CV: ${cvId}`);
     } catch (error) {
-      logger.error(`Failed to parse CV ${cvId}:`, error);
+      logger.error({ err: error }, `Failed to parse CV ${cvId}:`);
       await supabaseAdmin.from("cvs").update({ parse_status: "failed" }).eq("id", cvId);
       throw error;
     }

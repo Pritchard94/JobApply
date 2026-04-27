@@ -1,3 +1,4 @@
+// @ts-ignore
 import pdf from "pdf-parse";
 import mammoth from "mammoth";
 import { logger } from "./logger.js";
@@ -19,7 +20,7 @@ export async function extractTextFromFile(buffer: Buffer, mimeType: string): Pro
       throw new Error(`Unsupported file type: ${mimeType}`);
     }
   } catch (error) {
-    logger.error("Error extracting text from file:", error);
+    logger.error({ err: error }, "Error extracting text from file:");
     throw new Error("Failed to extract text from file");
   }
 }

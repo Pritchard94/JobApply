@@ -12,6 +12,7 @@
     "@google/generative-ai": "^0.21.0",
     "@job-auto-apply/shared": "*",
     "@supabase/supabase-js": "^2.49.0",
+    "axios": "^1.15.2",
     "bullmq": "^5.34.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",

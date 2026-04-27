@@ -83,7 +83,7 @@ export const applicationWorker = new Worker(
 
       logger.info(`Successfully processed application: ${applicationId}`);
     } catch (error) {
-      logger.error(`Failed to process application ${applicationId}:`, error);
+      logger.error({ err: error }, `Failed to process application ${applicationId}:`);
       await supabaseAdmin.from("applications").update({ status: "failed" }).eq("id", applicationId);
       throw error;
     }

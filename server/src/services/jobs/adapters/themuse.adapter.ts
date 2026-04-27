@@ -33,7 +33,7 @@ export class TheMuseAdapter implements JobAdapter {
         raw_data: job,
       }));
     } catch (error) {
-      logger.error("The Muse adapter error:", error);
+      logger.error({ err: error }, "The Muse adapter error:");
       return [];
     }
   }

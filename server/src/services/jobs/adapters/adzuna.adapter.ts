@@ -47,7 +47,7 @@ export class AdzunaAdapter implements JobAdapter {
         raw_data: job,
       }));
     } catch (error) {
-      logger.error("Adzuna adapter error:", error);
+      logger.error({ err: error }, "Adzuna adapter error:");
       return [];
     }
   }

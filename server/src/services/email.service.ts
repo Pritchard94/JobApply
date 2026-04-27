@@ -96,7 +96,7 @@ export class EmailService {
         threadId: res.data.threadId,
       };
     } catch (error) {
-      logger.error("Error sending email via Gmail:", error);
+      logger.error({ err: error }, "Error sending email via Gmail:");
       throw error;
     }
   }
