@@ -2,6 +2,7 @@
   "name": "@job-auto-apply/server",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "npm run build --prefix ../shared && tsc -b --force",
