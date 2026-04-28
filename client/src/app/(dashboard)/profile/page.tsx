@@ -1,16 +1,74 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, CheckCircle, Clock, X, User } from "lucide-react";
+import { Upload, FileText, CheckCircle, Clock, X, User, Loader2, Trash2, Check } from "lucide-react";
+import { useUserStore } from "@/store/user";
+import { api, apiUpload } from "@/lib/api";
+
+interface CV {
+  id: string;
+  file_name: string;
+  file_url: string;
+  parse_status: string;
+  is_primary: boolean;
+  created_at: string;
+}
 
 export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [cvs, setCvs] = useState<CV[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Personal info state
+  const [fullName, setFullName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [location, setLocation] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [portfolioUrl, setPortfolioUrl] = useState("");
+  const [experience, setExperience] = useState(0);
+
+  const session = useUserStore((s) => s.session);
+  const profile = useUserStore((s) => s.profile);
+  const setProfile = useUserStore((s) => s.setProfile);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    fetchData();
+  }, [session]);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
+      setLocation(profile.location || "");
+      setLinkedinUrl(profile.linkedin_url || "");
+      setPortfolioUrl(profile.portfolio_url || "");
+      setExperience(profile.years_of_experience || 0);
+    }
+  }, [profile]);
+
+  async function fetchData() {
+    setLoading(true);
+    try {
+      const [profileData, cvsData] = await Promise.all([
+        api<any>("/settings", { token: session?.access_token }),
+        api<CV[]>("/cv", { token: session?.access_token }),
+      ]);
+      setProfile(profileData);
+      setCvs(cvsData);
+    } catch (error) {
+      console.error("Failed to fetch profile data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -20,10 +78,83 @@ export default function ProfilePage() {
   }
 
   async function handleUpload() {
-    if (!cvFile) return;
+    if (!cvFile || !session?.access_token) return;
     setUploading(true);
-    // TODO: Call API to upload CV
-    setTimeout(() => setUploading(false), 2000);
+    try {
+      const formData = new FormData();
+      formData.append("cv", cvFile);
+      const res = await apiUpload<CV>("/cv/upload", formData, session.access_token);
+      setCvs([res, ...cvs]);
+      setCvFile(null);
+      alert("CV uploaded and parsing started!");
+    } catch (error: any) {
+      alert(error.message || "Failed to upload CV");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleSetPrimary(id: string) {
+    if (!session?.access_token) return;
+    try {
+      await api(`/cv/${id}/set-primary`, {
+        method: "POST",
+        token: session.access_token,
+      });
+      setCvs(cvs.map(cv => ({
+        ...cv,
+        is_primary: cv.id === id
+      })));
+    } catch (error) {
+      console.error("Failed to set primary CV:", error);
+    }
+  }
+
+  async function handleDeleteCV(id: string) {
+    if (!session?.access_token) return;
+    if (!confirm("Are you sure you want to delete this CV?")) return;
+    try {
+      await api(`/cv/${id}`, {
+        method: "DELETE",
+        token: session.access_token,
+      });
+      setCvs(cvs.filter(cv => cv.id !== id));
+    } catch (error) {
+      console.error("Failed to delete CV:", error);
+    }
+  }
+
+  async function handleSaveInfo() {
+    if (!session?.access_token) return;
+    setSaving(true);
+    try {
+      const res = await api<any>("/settings", {
+        method: "PATCH",
+        token: session.access_token,
+        body: JSON.stringify({
+          full_name: fullName,
+          phone,
+          location,
+          linkedin_url: linkedinUrl,
+          portfolio_url: portfolioUrl,
+          years_of_experience: experience,
+        }),
+      });
+      setProfile(res);
+      alert("Personal information saved!");
+    } catch (error: any) {
+      alert(error.message || "Failed to save info");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -107,14 +238,50 @@ export default function ProfilePage() {
               <CardTitle>Your Resumes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8">
-                <div className="rounded-full bg-muted p-3 mx-auto w-fit mb-3">
-                  <FileText className="h-6 w-6 text-muted-foreground" />
+              {cvs.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="rounded-full bg-muted p-3 mx-auto w-fit mb-3">
+                    <FileText className="h-6 w-6 text-muted-foreground" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    No CVs uploaded yet
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  No CVs uploaded yet
-                </p>
-              </div>
+              ) : (
+                <div className="space-y-3">
+                  {cvs.map((cv) => (
+                    <div key={cv.id} className="flex items-center gap-3 p-3 rounded-lg border hover:bg-accent/20 transition-colors">
+                      <div className="h-9 w-9 rounded bg-primary/10 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium truncate">{cv.file_name}</p>
+                          {cv.is_primary && (
+                            <Badge variant="success" className="text-[10px] px-1.5 py-0">Primary</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Added on {new Date(cv.created_at).toLocaleDateString()} • Status: {cv.parse_status}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        {!cv.is_primary && (
+                          <Button variant="ghost" size="icon" onClick={() => handleSetPrimary(cv.id)}>
+                            <Check className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => window.open(cv.file_url, "_blank")}>
+                          <CheckCircle className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteCV(cv.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -133,39 +300,72 @@ export default function ProfilePage() {
                 <label className="text-sm font-medium mb-1.5 block">
                   Full Name
                 </label>
-                <Input placeholder="John Doe" />
+                <Input 
+                  placeholder="John Doe" 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
                   Phone
                 </label>
-                <Input placeholder="+1 (555) 000-0000" />
+                <Input 
+                  placeholder="+1 (555) 000-0000" 
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
                   Location
                 </label>
-                <Input placeholder="New York, NY" />
+                <Input 
+                  placeholder="New York, NY" 
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
                   LinkedIn URL
                 </label>
-                <Input placeholder="https://linkedin.com/in/..." />
+                <Input 
+                  placeholder="https://linkedin.com/in/..." 
+                  value={linkedinUrl}
+                  onChange={(e) => setLinkedinUrl(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
                   Portfolio URL
                 </label>
-                <Input placeholder="https://yourportfolio.com" />
+                <Input 
+                  placeholder="https://yourportfolio.com" 
+                  value={portfolioUrl}
+                  onChange={(e) => setPortfolioUrl(e.target.value)}
+                />
               </div>
               <div>
                 <label className="text-sm font-medium mb-1.5 block">
                   Years of Experience
                 </label>
-                <Input type="number" placeholder="5" min={0} max={50} />
+                <Input 
+                  type="number" 
+                  placeholder="5" 
+                  min={0} 
+                  max={50} 
+                  value={experience}
+                  onChange={(e) => setExperience(parseInt(e.target.value) || 0)}
+                />
               </div>
-              <Button className="w-full mt-2">Save Changes</Button>
+              <Button 
+                className="w-full mt-2" 
+                onClick={handleSaveInfo}
+                disabled={saving}
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Changes"}
+              </Button>
             </CardContent>
           </Card>
         </div>

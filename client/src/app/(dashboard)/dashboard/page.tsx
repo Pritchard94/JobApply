@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -12,25 +13,115 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import Link from "next/link";
+import { useUserStore } from "@/store/user";
+import { api } from "@/lib/api";
 
-const stats = [
-  {
-    label: "Total Applications",
-    value: "0",
-    icon: FileText,
-    change: "+0 today",
-  },
-  { label: "Applications Sent", value: "0", icon: Send, change: "0 pending" },
-  {
-    label: "Interviews",
-    value: "0",
-    icon: MessageSquare,
-    change: "0 scheduled",
-  },
-  { label: "Offers", value: "0", icon: Trophy, change: "Keep going!" },
-];
+interface AppStats {
+  total: number;
+  pending: number;
+  sent: number;
+  interview: number;
+  offer: number;
+}
+
+interface JobStats {
+  total_matches: number;
+  high_matches: number;
+}
+
+interface SetupStatus {
+  hasCv: boolean;
+  hasProfile: boolean;
+  hasGmail: boolean;
+}
 
 export default function DashboardPage() {
+  const session = useUserStore((s) => s.session);
+  const [appStats, setAppStats] = useState<AppStats | null>(null);
+  const [jobStats, setJobStats] = useState<JobStats | null>(null);
+  const [setup, setSetup] = useState<SetupStatus>({ hasCv: false, hasProfile: false, hasGmail: false });
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    const token = session.access_token;
+
+    async function load() {
+      try {
+        const [stats, jStats, cvs, profiles, gmail] = await Promise.allSettled([
+          api<AppStats>("/applications/stats", { token }),
+          api<JobStats>("/jobs/stats", { token }),
+          api<unknown[]>("/cv", { token }),
+          api<unknown[]>("/profiles", { token }),
+          api<{ connected: boolean }>("/auth/gmail/status", { token }),
+        ]);
+
+        if (stats.status === "fulfilled") setAppStats(stats.value);
+        if (jStats.status === "fulfilled") setJobStats(jStats.value);
+
+        setSetup({
+          hasCv: cvs.status === "fulfilled" && Array.isArray(cvs.value) && cvs.value.length > 0,
+          hasProfile: profiles.status === "fulfilled" && Array.isArray(profiles.value) && profiles.value.length > 0,
+          hasGmail: gmail.status === "fulfilled" && gmail.value.connected,
+        });
+      } catch {
+        // silently fail — user just sees zeros
+      }
+    }
+
+    load();
+  }, [session]);
+
+  const stats = [
+    {
+      label: "Total Applications",
+      value: appStats?.total ?? "—",
+      icon: FileText,
+      change: appStats ? `${appStats.pending} pending` : "Loading...",
+    },
+    {
+      label: "Applications Sent",
+      value: appStats?.sent ?? "—",
+      icon: Send,
+      change: appStats ? `${appStats.pending} pending` : "Loading...",
+    },
+    {
+      label: "Interviews",
+      value: appStats?.interview ?? "—",
+      icon: MessageSquare,
+      change: jobStats ? `${jobStats.high_matches} high matches` : "Loading...",
+    },
+    {
+      label: "Offers",
+      value: appStats?.offer ?? "—",
+      icon: Trophy,
+      change: appStats && appStats.offer > 0 ? "🎉 Congratulations!" : "Keep going!",
+    },
+  ];
+
+  const setupSteps = [
+    {
+      step: "1",
+      title: "Upload Your CV",
+      desc: "Upload a PDF of your resume",
+      href: "/profile",
+      done: setup.hasCv,
+    },
+    {
+      step: "2",
+      title: "Create Search Profile",
+      desc: "Define your ideal job criteria",
+      href: "/search-profiles",
+      done: setup.hasProfile,
+    },
+    {
+      step: "3",
+      title: "Connect Gmail",
+      desc: "Allow sending applications via your email",
+      href: "/settings",
+      done: setup.hasGmail,
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -97,58 +188,55 @@ export default function DashboardPage() {
             <CardTitle className="flex items-center gap-2">
               <Briefcase className="h-4 w-4 text-primary" />
               Top Job Matches
+              {jobStats && jobStats.total_matches > 0 && (
+                <Badge variant="secondary" className="ml-auto text-xs">
+                  {jobStats.total_matches} found
+                </Badge>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <div className="rounded-full bg-muted p-3 mb-3">
-                <Briefcase className="h-6 w-6 text-muted-foreground" />
+            {jobStats && jobStats.total_matches > 0 ? (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  {jobStats.high_matches} high-scoring matches (70%+) waiting for you.
+                </p>
+                <Link
+                  href="/jobs"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  View all matches <ArrowUpRight className="h-3 w-3" />
+                </Link>
               </div>
-              <p className="text-sm font-medium">No matches yet</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Create a search profile to start finding jobs
-              </p>
-              <Link
-                href="/search-profiles"
-                className="mt-4 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-              >
-                Create search profile <ArrowUpRight className="h-3 w-3" />
-              </Link>
-            </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="rounded-full bg-muted p-3 mb-3">
+                  <Briefcase className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium">No matches yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Create a search profile to start finding jobs
+                </p>
+                <Link
+                  href="/search-profiles"
+                  className="mt-4 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  Create search profile <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Setup */}
       <Card>
         <CardHeader>
           <CardTitle>Quick Setup</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 sm:grid-cols-3">
-            {[
-              {
-                step: "1",
-                title: "Upload Your CV",
-                desc: "Upload a PDF of your resume",
-                href: "/profile",
-                done: false,
-              },
-              {
-                step: "2",
-                title: "Create Search Profile",
-                desc: "Define your ideal job criteria",
-                href: "/search-profiles",
-                done: false,
-              },
-              {
-                step: "3",
-                title: "Connect Gmail",
-                desc: "Allow sending applications via your email",
-                href: "/settings",
-                done: false,
-              },
-            ].map((item) => (
+            {setupSteps.map((item) => (
               <Link key={item.step} href={item.href}>
                 <div className="rounded-lg border p-4 hover:border-primary/30 hover:bg-accent/30 transition-all group cursor-pointer">
                   <div className="flex items-center gap-3 mb-2">

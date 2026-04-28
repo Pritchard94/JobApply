@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,11 @@ import {
   ToggleLeft,
   ToggleRight,
   Trash2,
+  Loader2,
+  Play,
 } from "lucide-react";
+import { useUserStore } from "@/store/user";
+import { api } from "@/lib/api";
 
 interface SearchProfileData {
   id: string;
@@ -35,46 +39,117 @@ interface SearchProfileData {
 
 export default function SearchProfilesPage() {
   const [profiles, setProfiles] = useState<SearchProfileData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newTitles, setNewTitles] = useState("");
   const [newLocations, setNewLocations] = useState("");
   const [newFrequency, setNewFrequency] = useState("daily");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  function handleCreate(e: React.FormEvent) {
+  const session = useUserStore((s) => s.session);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    fetchProfiles();
+  }, [session]);
+
+  async function fetchProfiles() {
+    setLoading(true);
+    try {
+      const res = await api<SearchProfileData[]>("/profiles", {
+        token: session?.access_token,
+      });
+      setProfiles(res);
+    } catch (error) {
+      console.error("Failed to fetch profiles:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    const profile: SearchProfileData = {
-      id: Date.now().toString(),
-      name: newName,
-      job_titles: newTitles
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      locations: newLocations
-        .split(",")
-        .map((l) => l.trim())
-        .filter(Boolean),
-      is_active: true,
-      search_frequency: newFrequency,
-      last_searched_at: null,
-    };
-    setProfiles([...profiles, profile]);
-    setShowCreate(false);
-    setNewName("");
-    setNewTitles("");
-    setNewLocations("");
+    if (!session?.access_token) return;
+
+    setIsSubmitting(true);
+    try {
+      const profile = {
+        name: newName,
+        job_titles: newTitles
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        locations: newLocations
+          .split(",")
+          .map((l) => l.trim())
+          .filter(Boolean),
+        search_frequency: newFrequency,
+        is_active: true,
+      };
+
+      const res = await api<SearchProfileData>("/profiles", {
+        method: "POST",
+        token: session.access_token,
+        body: JSON.stringify(profile),
+      });
+
+      setProfiles([res, ...profiles]);
+      setShowCreate(false);
+      setNewName("");
+      setNewTitles("");
+      setNewLocations("");
+    } catch (error: any) {
+      alert(error.message || "Failed to create profile");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
-  function toggleActive(id: string) {
-    setProfiles(
-      profiles.map((p) =>
-        p.id === id ? { ...p, is_active: !p.is_active } : p,
-      ),
-    );
+  async function toggleActive(id: string, current: boolean) {
+    if (!session?.access_token) return;
+    try {
+      const res = await api<SearchProfileData>(`/profiles/${id}`, {
+        method: "PUT",
+        token: session.access_token,
+        body: JSON.stringify({ is_active: !current }),
+      });
+      setProfiles(profiles.map((p) => (p.id === id ? res : p)));
+    } catch (error) {
+      console.error("Failed to toggle profile:", error);
+    }
   }
 
-  function deleteProfile(id: string) {
-    setProfiles(profiles.filter((p) => p.id !== id));
+  async function deleteProfile(id: string) {
+    if (!session?.access_token) return;
+    if (!confirm("Are you sure you want to delete this profile?")) return;
+
+    try {
+      await api(`/profiles/${id}`, {
+        method: "DELETE",
+        token: session.access_token,
+      });
+      setProfiles(profiles.filter((p) => p.id !== id));
+    } catch (error) {
+      console.error("Failed to delete profile:", error);
+    }
+  }
+
+  async function handleSearchNow(id: string) {
+    if (!session?.access_token) return;
+    setActionLoading(id);
+    try {
+      await api(`/profiles/${id}/search-now`, {
+        method: "POST",
+        token: session.access_token,
+      });
+      alert("Job search started! Check your dashboard in a few minutes.");
+    } catch (error: any) {
+      alert(error.message || "Failed to start search");
+    } finally {
+      setActionLoading(null);
+    }
   }
 
   return (
@@ -92,7 +167,13 @@ export default function SearchProfilesPage() {
         </Button>
       </div>
 
-      {profiles.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {[1, 2].map((i) => (
+            <div key={i} className="h-48 w-full animate-pulse bg-muted rounded-lg" />
+          ))}
+        </div>
+      ) : profiles.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="rounded-full bg-muted p-4 mb-4">
@@ -133,7 +214,7 @@ export default function SearchProfilesPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => toggleActive(profile.id)}
+                    onClick={() => toggleActive(profile.id, profile.is_active)}
                   >
                     {profile.is_active ? (
                       <ToggleRight className="h-5 w-5 text-primary" />
@@ -182,8 +263,19 @@ export default function SearchProfilesPage() {
                       Edit
                     </Button>
                   </Link>
-                  <Button size="sm" className="flex-1">
-                    Search Now
+                  <Button 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => handleSearchNow(profile.id)}
+                    disabled={actionLoading === profile.id || !profile.is_active}
+                  >
+                    {actionLoading === profile.id ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="h-3 w-3 mr-1" /> Search Now
+                      </>
+                    )}
                   </Button>
                 </div>
               </CardContent>
@@ -255,12 +347,13 @@ export default function SearchProfilesPage() {
               type="button"
               variant="outline"
               className="flex-1"
+              disabled={isSubmitting}
               onClick={() => setShowCreate(false)}
             >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1">
-              Create Profile
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Create Profile"}
             </Button>
           </div>
         </form>

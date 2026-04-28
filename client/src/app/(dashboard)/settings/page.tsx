@@ -13,8 +13,10 @@ import {
   Zap,
   CheckCircle,
   XCircle,
-  ExternalLink,
+  Loader2,
 } from "lucide-react";
+import { useUserStore } from "@/store/user";
+import { api } from "@/lib/api";
 
 export default function SettingsPage() {
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -22,21 +24,103 @@ export default function SettingsPage() {
   const [autoApply, setAutoApply] = useState(false);
   const [dailyLimit, setDailyLimit] = useState(10);
   const [pushEnabled, setPushEnabled] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const session = useUserStore((s) => s.session);
+  const setProfile = useUserStore((s) => s.setProfile);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    fetchSettings();
+  }, [session]);
+
+  async function fetchSettings() {
+    setLoading(true);
+    try {
+      const [profile, gmailStatus] = await Promise.all([
+        api<any>("/settings", { token: session?.access_token }),
+        api<any>("/auth/gmail/status", { token: session?.access_token }),
+      ]);
+
+      setProfile(profile);
+      setAutoApply(profile.auto_apply_enabled);
+      setDailyLimit(profile.daily_apply_limit);
+      setGmailConnected(gmailStatus.connected);
+      setGmailAddress(gmailStatus.gmail_address);
+    } catch (error) {
+      console.error("Failed to fetch settings:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   // Check URL params for Gmail OAuth callback result
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("gmail") === "success") {
       setGmailConnected(true);
-      // Clean URL
+      window.history.replaceState({}, "", "/settings");
+      fetchSettings();
+    } else if (params.get("gmail") === "error") {
+      alert("Failed to connect Gmail: " + params.get("reason"));
       window.history.replaceState({}, "", "/settings");
     }
   }, []);
 
   async function connectGmail() {
-    // TODO: Call backend to get Gmail OAuth URL
-    // const { url } = await api('/auth/gmail', { token });
-    // window.location.href = url;
+    if (!session?.access_token) return;
+    try {
+      const { url } = await api<any>("/auth/gmail", { token: session.access_token });
+      window.location.href = url;
+    } catch (error: any) {
+      alert(error.message || "Failed to initiate Gmail connection");
+    }
+  }
+
+  async function disconnectGmail() {
+    if (!session?.access_token) return;
+    if (!confirm("Are you sure you want to disconnect Gmail? Auto-apply will stop working.")) return;
+    
+    try {
+      await api("/auth/gmail", { 
+        method: "DELETE", 
+        token: session.access_token 
+      });
+      setGmailConnected(false);
+      setGmailAddress("");
+    } catch (error) {
+      console.error("Failed to disconnect Gmail:", error);
+    }
+  }
+
+  async function saveAutoApplySettings() {
+    if (!session?.access_token) return;
+    setSaving(true);
+    try {
+      const res = await api<any>("/settings/auto-apply", {
+        method: "PATCH",
+        token: session.access_token,
+        body: JSON.stringify({
+          auto_apply_enabled: autoApply,
+          daily_apply_limit: dailyLimit,
+        }),
+      });
+      setProfile(res);
+      alert("Settings saved!");
+    } catch (error: any) {
+      alert(error.message || "Failed to save settings");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -69,13 +153,13 @@ export default function SettingsPage() {
                   <div className="flex-1">
                     <p className="text-sm font-medium">Connected</p>
                     <p className="text-xs text-muted-foreground">
-                      {gmailAddress || "your@gmail.com"}
+                      {gmailAddress}
                     </p>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setGmailConnected(false)}
+                    onClick={disconnectGmail}
                   >
                     Disconnect
                   </Button>
@@ -155,7 +239,13 @@ export default function SettingsPage() {
                 <span>50</span>
               </div>
             </div>
-            <Button className="w-full">Save Settings</Button>
+            <Button 
+              className="w-full" 
+              onClick={saveAutoApplySettings}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Settings"}
+            </Button>
           </CardContent>
         </Card>
 

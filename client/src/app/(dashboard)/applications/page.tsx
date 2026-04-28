@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Filter,
 } from "lucide-react";
+import { useUserStore } from "@/store/user";
+import { api } from "@/lib/api";
 
 type Status = "all" | "pending" | "sent" | "interview" | "rejected" | "offer";
 
@@ -36,17 +38,40 @@ const statusFilters: { value: Status; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ];
 
+interface Application {
+  id: string;
+  status: string;
+  found_jobs: { title: string; company: string };
+  applied_at: string | null;
+  created_at: string;
+}
+
 export default function ApplicationsPage() {
   const [activeFilter, setActiveFilter] = useState<Status>("all");
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [loading, setLoading] = useState(true);
+  const session = useUserStore((s) => s.session);
 
-  // Placeholder - will be populated from API
-  const applications: Array<{
-    id: string;
-    status: string;
-    job: { title: string; company: string };
-    applied_at: string | null;
-    created_at: string;
-  }> = [];
+  useEffect(() => {
+    if (!session?.access_token) return;
+
+    async function fetchApplications() {
+      setLoading(true);
+      try {
+        const endpoint = activeFilter === "all" ? "/applications" : `/applications?status=${activeFilter}`;
+        const res = await api<{ data: Application[] }>(endpoint, {
+          token: session?.access_token,
+        });
+        setApplications(res.data);
+      } catch (error) {
+        console.error("Failed to fetch applications:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchApplications();
+  }, [session, activeFilter]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -72,7 +97,13 @@ export default function ApplicationsPage() {
         ))}
       </div>
 
-      {applications.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 w-full animate-pulse bg-muted rounded-lg" />
+          ))}
+        </div>
+      ) : applications.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <div className="rounded-full bg-muted p-4 mb-4">
@@ -98,10 +129,10 @@ export default function ApplicationsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold truncate">
-                    {app.job.title}
+                    {app.found_jobs?.title || "Unknown Position"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {app.job.company}
+                    {app.found_jobs?.company || "Unknown Company"}
                   </p>
                 </div>
                 <Badge variant={statusVariantMap[app.status] || "pending"}>
@@ -111,7 +142,9 @@ export default function ApplicationsPage() {
                   <Calendar className="h-3 w-3" />
                   {app.applied_at
                     ? new Date(app.applied_at).toLocaleDateString()
-                    : "Pending"}
+                    : app.created_at 
+                      ? new Date(app.created_at).toLocaleDateString()
+                      : "Pending"}
                 </div>
                 <Button variant="ghost" size="icon" className="shrink-0">
                   <ChevronRight className="h-4 w-4" />
