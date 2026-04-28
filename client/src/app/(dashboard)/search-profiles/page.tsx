@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,12 +51,8 @@ export default function SearchProfilesPage() {
 
   const session = useUserStore((s) => s.session);
 
-  useEffect(() => {
+  const fetchProfiles = useCallback(async () => {
     if (!session?.access_token) return;
-    fetchProfiles();
-  }, [session]);
-
-  async function fetchProfiles() {
     setLoading(true);
     try {
       const res = await api<SearchProfileData[]>("/profiles", {
@@ -68,7 +64,11 @@ export default function SearchProfilesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    fetchProfiles();
+  }, [fetchProfiles]);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

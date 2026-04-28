@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,12 +69,8 @@ export default function JobsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const session = useUserStore((s) => s.session);
 
-  useEffect(() => {
+  const fetchJobs = useCallback(async () => {
     if (!session?.access_token) return;
-    fetchJobs();
-  }, [session]);
-
-  async function fetchJobs() {
     // We don't reset jobs to [] to allow stale-while-revalidate feel if they revisit
     setLoading(true);
     try {
@@ -87,7 +83,11 @@ export default function JobsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    fetchJobs();
+  }, [fetchJobs]);
 
   async function handleApply(jobId: string) {
     if (!session?.access_token) return;

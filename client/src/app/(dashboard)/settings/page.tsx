@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,19 +32,8 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(!profile);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (profile) {
-      setAutoApply(profile.auto_apply_enabled);
-      setDailyLimit(profile.daily_apply_limit);
-    }
-  }, [profile]);
-
-  useEffect(() => {
+  const fetchSettings = useCallback(async () => {
     if (!session?.access_token) return;
-    fetchSettings();
-  }, [session]);
-
-  async function fetchSettings() {
     // If we have a profile, we don't need a full page loader
     if (!profile) setLoading(true);
     
@@ -62,7 +51,18 @@ export default function SettingsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [session?.access_token, profile, setProfile]);
+
+  useEffect(() => {
+    if (profile) {
+      setAutoApply(profile.auto_apply_enabled);
+      setDailyLimit(profile.daily_apply_limit);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    fetchSettings();
+  }, [fetchSettings]);
 
   // Check URL params for Gmail OAuth callback result
   useEffect(() => {
@@ -75,7 +75,7 @@ export default function SettingsPage() {
       useNotificationStore.getState().showError("Failed to connect Gmail: " + params.get("reason"));
       window.history.replaceState({}, "", "/settings");
     }
-  }, []);
+  }, [fetchSettings]);
 
   async function connectGmail() {
     if (!session?.access_token) return;

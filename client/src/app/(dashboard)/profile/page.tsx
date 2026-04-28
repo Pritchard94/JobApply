@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,23 +39,8 @@ export default function ProfilePage() {
   const [portfolioUrl, setPortfolioUrl] = useState(profile?.portfolio_url || "");
   const [experience, setExperience] = useState(profile?.years_of_experience || 0);
 
-  useEffect(() => {
-    if (profile) {
-      setFullName(profile.full_name || "");
-      setPhone(profile.phone || "");
-      setLocation(profile.location || "");
-      setLinkedinUrl(profile.linkedin_url || "");
-      setPortfolioUrl(profile.portfolio_url || "");
-      setExperience(profile.years_of_experience || 0);
-    }
-  }, [profile]);
-
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     if (!session?.access_token) return;
-    fetchData();
-  }, [session]);
-
-  async function fetchData() {
     if (!profile) setLoading(true);
     try {
       const [profileData, cvsData] = await Promise.all([
@@ -69,7 +54,22 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [session?.access_token, profile, setProfile]);
+
+  useEffect(() => {
+    if (profile) {
+      setFullName(profile.full_name || "");
+      setPhone(profile.phone || "");
+      setLocation(profile.location || "");
+      setLinkedinUrl(profile.linkedin_url || "");
+      setPortfolioUrl(profile.portfolio_url || "");
+      setExperience(profile.years_of_experience || 0);
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
