@@ -25,6 +25,7 @@ import {
   Play,
 } from "lucide-react";
 import { useUserStore } from "@/store/user";
+import { useNotificationStore } from "@/store/notification";
 import { api } from "@/lib/api";
 
 interface SearchProfileData {
@@ -101,7 +102,7 @@ export default function SearchProfilesPage() {
       setNewTitles("");
       setNewLocations("");
     } catch (error: any) {
-      alert(error.message || "Failed to create profile");
+      // Handled by api utility
     } finally {
       setIsSubmitting(false);
     }
@@ -144,9 +145,9 @@ export default function SearchProfilesPage() {
         method: "POST",
         token: session.access_token,
       });
-      alert("Job search started! Check your dashboard in a few minutes.");
+      useNotificationStore.getState().showSuccess("Job search started! Check your dashboard in a few minutes.");
     } catch (error: any) {
-      alert(error.message || "Failed to start search");
+      // Handled by api utility
     } finally {
       setActionLoading(null);
     }

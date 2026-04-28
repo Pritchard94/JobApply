@@ -17,6 +17,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useUserStore } from "@/store/user";
+import { useNotificationStore } from "@/store/notification";
 import { api } from "@/lib/api";
 
 interface JobMatch {
@@ -69,10 +70,9 @@ export default function JobsPage() {
         method: "POST",
         token: session.access_token,
       });
-      // Optionally remove from list or update state
-      alert("Application queued successfully!");
+      useNotificationStore.getState().showSuccess("Application queued successfully!");
     } catch (error: any) {
-      alert(error.message || "Failed to apply");
+      // Handled by api utility
     } finally {
       setActionLoading(null);
     }

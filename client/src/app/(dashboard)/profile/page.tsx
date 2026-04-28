@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Upload, FileText, CheckCircle, Clock, X, User, Loader2, Trash2, Check } from "lucide-react";
 import { useUserStore } from "@/store/user";
+import { useNotificationStore } from "@/store/notification";
 import { api, apiUpload } from "@/lib/api";
 
 interface CV {
@@ -86,9 +87,9 @@ export default function ProfilePage() {
       const res = await apiUpload<CV>("/cv/upload", formData, session.access_token);
       setCvs([res, ...cvs]);
       setCvFile(null);
-      alert("CV uploaded and parsing started!");
+      useNotificationStore.getState().showSuccess("CV uploaded and parsing started!");
     } catch (error: any) {
-      alert(error.message || "Failed to upload CV");
+      // Handled by api utility
     } finally {
       setUploading(false);
     }
@@ -141,9 +142,9 @@ export default function ProfilePage() {
         }),
       });
       setProfile(res);
-      alert("Personal information saved!");
+      useNotificationStore.getState().showSuccess("Personal information saved!");
     } catch (error: any) {
-      alert(error.message || "Failed to save info");
+      // Handled by api utility
     } finally {
       setSaving(false);
     }

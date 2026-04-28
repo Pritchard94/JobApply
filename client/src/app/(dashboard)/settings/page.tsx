@@ -16,6 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useUserStore } from "@/store/user";
+import { useNotificationStore } from "@/store/notification";
 import { api } from "@/lib/api";
 
 export default function SettingsPage() {
@@ -63,7 +64,7 @@ export default function SettingsPage() {
       window.history.replaceState({}, "", "/settings");
       fetchSettings();
     } else if (params.get("gmail") === "error") {
-      alert("Failed to connect Gmail: " + params.get("reason"));
+      useNotificationStore.getState().showError("Failed to connect Gmail: " + params.get("reason"));
       window.history.replaceState({}, "", "/settings");
     }
   }, []);
@@ -74,7 +75,7 @@ export default function SettingsPage() {
       const { url } = await api<any>("/auth/gmail", { token: session.access_token });
       window.location.href = url;
     } catch (error: any) {
-      alert(error.message || "Failed to initiate Gmail connection");
+      // Handled by api utility
     }
   }
 
@@ -107,9 +108,9 @@ export default function SettingsPage() {
         }),
       });
       setProfile(res);
-      alert("Settings saved!");
+      useNotificationStore.getState().showSuccess("Settings saved!");
     } catch (error: any) {
-      alert(error.message || "Failed to save settings");
+      // Handled by api utility
     } finally {
       setSaving(false);
     }

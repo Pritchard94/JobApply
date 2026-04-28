@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/auth-provider";
+import { NotificationModal } from "@/components/notification-modal";
 
 export const metadata: Metadata = {
   title: "AutoApply - Automated Job Applications",
@@ -28,7 +29,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <NotificationModal />
+        </AuthProvider>
       </body>
     </html>
   );
