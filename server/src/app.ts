@@ -9,6 +9,12 @@ import { apiRouter } from "./routes/index.js";
 export function createApp() {
   const app = express();
 
+  // Request Logging
+  app.use((req, _res, next) => {
+    console.log(`${req.method} ${req.path}`);
+    next();
+  });
+
   // Security
   app.use(helmet({
     crossOriginResourcePolicy: false, // Allow images from other domains (Supabase storage)
@@ -57,6 +63,19 @@ export function createApp() {
 
   // API routes
   app.use("/api/v1", apiRouter);
+
+  // Fallback 404
+  app.use((req, res) => {
+    console.warn(`404 Not Found: ${req.method} ${req.path}`);
+    res.status(404).json({
+      error: "Route not found",
+      path: req.path,
+      method: req.method,
+      suggestion: req.path.startsWith("/api/v1") 
+        ? "Check if the route is correctly defined in the backend." 
+        : "Missing /api/v1 prefix? Try adding it to your base URL."
+    });
+  });
 
   // Error handler (must be last)
   app.use(errorHandler);
