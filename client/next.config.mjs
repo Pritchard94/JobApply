@@ -10,7 +10,7 @@ const nextConfig = {
   webpack: (config) => {
     config.resolve.alias["@job-auto-apply/shared"] = path.resolve(
       __dirname,
-      "../shared/src/index.ts"
+      "../shared/src"
     );
     return config;
   },
