@@ -36,6 +36,32 @@ interface JobMatch {
   };
 }
 
+export function JobCardSkeleton() {
+  return (
+    <Card className="animate-pulse border-muted">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex justify-between">
+          <div className="h-4 w-16 bg-muted rounded" />
+          <div className="h-4 w-12 bg-muted rounded" />
+        </div>
+        <div className="space-y-2">
+          <div className="h-5 w-full bg-muted rounded" />
+          <div className="h-5 w-2/3 bg-muted rounded" />
+        </div>
+        <div className="space-y-1">
+          <div className="h-3 w-1/2 bg-muted rounded" />
+          <div className="h-3 w-1/3 bg-muted rounded" />
+        </div>
+        <div className="flex gap-2 pt-2">
+          <div className="h-8 flex-1 bg-muted rounded" />
+          <div className="h-8 w-10 bg-muted rounded" />
+          <div className="h-8 w-10 bg-muted rounded" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function JobsPage() {
   const [filter, setFilter] = useState("");
   const [jobs, setJobs] = useState<JobMatch[]>([]);
@@ -49,6 +75,7 @@ export default function JobsPage() {
   }, [session]);
 
   async function fetchJobs() {
+    // We don't reset jobs to [] to allow stale-while-revalidate feel if they revisit
     setLoading(true);
     try {
       const res = await api<{ data: JobMatch[] }>("/jobs", {
@@ -149,10 +176,10 @@ export default function JobsPage() {
         </span>
       </div>
 
-      {loading ? (
+      {loading && jobs.length === 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-64 w-full animate-pulse bg-muted rounded-lg" />
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <JobCardSkeleton key={i} />
           ))}
         </div>
       ) : filteredJobs.length === 0 ? (

@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Briefcase,
   ArrowUpRight,
+  Zap,
 } from "lucide-react";
 import Link from "next/link";
 import { useUserStore } from "@/store/user";
@@ -39,36 +40,39 @@ export default function DashboardPage() {
   const session = useUserStore((s) => s.session);
   const [appStats, setAppStats] = useState<AppStats | null>(null);
   const [jobStats, setJobStats] = useState<JobStats | null>(null);
-  const [setup, setSetup] = useState<SetupStatus>({ hasCv: false, hasProfile: false, hasGmail: false });
+  const [setup, setSetup] = useState<SetupStatus>({
+    hasCv: false,
+    hasProfile: false,
+    hasGmail: false,
+  });
 
   useEffect(() => {
     if (!session?.access_token) return;
     const token = session.access_token;
 
-    async function load() {
-      try {
-        const [stats, jStats, cvs, profiles, gmail] = await Promise.allSettled([
-          api<AppStats>("/applications/stats", { token }),
-          api<JobStats>("/jobs/stats", { token }),
-          api<unknown[]>("/cv", { token }),
-          api<unknown[]>("/profiles", { token }),
-          api<{ connected: boolean }>("/auth/gmail/status", { token }),
-        ]);
+    // Load data independently to avoid blocking the whole UI
+    api<AppStats>("/applications/stats", { token })
+      .then(setAppStats)
+      .catch(() => {});
 
-        if (stats.status === "fulfilled") setAppStats(stats.value);
-        if (jStats.status === "fulfilled") setJobStats(jStats.value);
+    api<JobStats>("/jobs/stats", { token })
+      .then(setJobStats)
+      .catch(() => {});
 
-        setSetup({
-          hasCv: cvs.status === "fulfilled" && Array.isArray(cvs.value) && cvs.value.length > 0,
-          hasProfile: profiles.status === "fulfilled" && Array.isArray(profiles.value) && profiles.value.length > 0,
-          hasGmail: gmail.status === "fulfilled" && gmail.value.connected,
-        });
-      } catch {
-        // silently fail — user just sees zeros
-      }
-    }
-
-    load();
+    // For setup steps, we check multiple things
+    Promise.all([
+      api<any[]>("/cv", { token }).catch(() => []),
+      api<any[]>("/profiles", { token }).catch(() => []),
+      api<{ connected: boolean }>("/auth/gmail/status", { token }).catch(() => ({
+        connected: false,
+      })),
+    ]).then(([cvs, profiles, gmail]) => {
+      setSetup({
+        hasCv: Array.isArray(cvs) && cvs.length > 0,
+        hasProfile: Array.isArray(profiles) && profiles.length > 0,
+        hasGmail: !!gmail?.connected,
+      });
+    });
   }, [session]);
 
   const stats = [
@@ -94,7 +98,8 @@ export default function DashboardPage() {
       label: "Offers",
       value: appStats?.offer ?? "—",
       icon: Trophy,
-      change: appStats && appStats.offer > 0 ? "🎉 Congratulations!" : "Keep going!",
+      change:
+        appStats && appStats.offer > 0 ? "🎉 Congratulations!" : "Keep going!",
     },
   ];
 

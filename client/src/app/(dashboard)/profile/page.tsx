@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileText, CheckCircle, Clock, X, User, Loader2, Trash2, Check } from "lucide-react";
+import { Upload, FileText, CheckCircle, Clock, X, User, Loader2, Trash2, Check, CheckCircle2 } from "lucide-react";
 import { useUserStore } from "@/store/user";
 import { useNotificationStore } from "@/store/notification";
 import { api, apiUpload } from "@/lib/api";
@@ -28,21 +28,16 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
 
   // Personal info state
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [location, setLocation] = useState("");
-  const [linkedinUrl, setLinkedinUrl] = useState("");
-  const [portfolioUrl, setPortfolioUrl] = useState("");
-  const [experience, setExperience] = useState(0);
-
   const session = useUserStore((s) => s.session);
   const profile = useUserStore((s) => s.profile);
   const setProfile = useUserStore((s) => s.setProfile);
 
-  useEffect(() => {
-    if (!session?.access_token) return;
-    fetchData();
-  }, [session]);
+  const [fullName, setFullName] = useState(profile?.full_name || "");
+  const [phone, setPhone] = useState(profile?.phone || "");
+  const [location, setLocation] = useState(profile?.location || "");
+  const [linkedinUrl, setLinkedinUrl] = useState(profile?.linkedin_url || "");
+  const [portfolioUrl, setPortfolioUrl] = useState(profile?.portfolio_url || "");
+  const [experience, setExperience] = useState(profile?.years_of_experience || 0);
 
   useEffect(() => {
     if (profile) {
@@ -55,8 +50,13 @@ export default function ProfilePage() {
     }
   }, [profile]);
 
+  useEffect(() => {
+    if (!session?.access_token) return;
+    fetchData();
+  }, [session]);
+
   async function fetchData() {
-    setLoading(true);
+    if (!profile) setLoading(true);
     try {
       const [profileData, cvsData] = await Promise.all([
         api<any>("/settings", { token: session?.access_token }),
@@ -150,14 +150,6 @@ export default function ProfilePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -239,7 +231,13 @@ export default function ProfilePage() {
               <CardTitle>Your Resumes</CardTitle>
             </CardHeader>
             <CardContent>
-              {cvs.length === 0 ? (
+              {loading && cvs.length === 0 ? (
+                <div className="space-y-3">
+                  {[1, 2].map((i) => (
+                    <div key={i} className="h-16 animate-pulse bg-muted rounded-lg" />
+                  ))}
+                </div>
+              ) : cvs.length === 0 ? (
                 <div className="text-center py-8">
                   <div className="rounded-full bg-muted p-3 mx-auto w-fit mb-3">
                     <FileText className="h-6 w-6 text-muted-foreground" />
@@ -273,7 +271,7 @@ export default function ProfilePage() {
                           </Button>
                         )}
                         <Button variant="ghost" size="icon" onClick={() => window.open(cv.file_url, "_blank")}>
-                          <CheckCircle className="h-4 w-4" />
+                          <CheckCircle2 className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteCV(cv.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />

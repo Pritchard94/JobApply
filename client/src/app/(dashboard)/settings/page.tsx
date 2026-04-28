@@ -20,16 +20,24 @@ import { useNotificationStore } from "@/store/notification";
 import { api } from "@/lib/api";
 
 export default function SettingsPage() {
+  const session = useUserStore((s) => s.session);
+  const profile = useUserStore((s) => s.profile);
+  const setProfile = useUserStore((s) => s.setProfile);
+
   const [gmailConnected, setGmailConnected] = useState(false);
   const [gmailAddress, setGmailAddress] = useState("");
-  const [autoApply, setAutoApply] = useState(false);
-  const [dailyLimit, setDailyLimit] = useState(10);
+  const [autoApply, setAutoApply] = useState(profile?.auto_apply_enabled ?? false);
+  const [dailyLimit, setDailyLimit] = useState(profile?.daily_apply_limit ?? 10);
   const [pushEnabled, setPushEnabled] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!profile);
   const [saving, setSaving] = useState(false);
 
-  const session = useUserStore((s) => s.session);
-  const setProfile = useUserStore((s) => s.setProfile);
+  useEffect(() => {
+    if (profile) {
+      setAutoApply(profile.auto_apply_enabled);
+      setDailyLimit(profile.daily_apply_limit);
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (!session?.access_token) return;
@@ -37,16 +45,16 @@ export default function SettingsPage() {
   }, [session]);
 
   async function fetchSettings() {
-    setLoading(true);
+    // If we have a profile, we don't need a full page loader
+    if (!profile) setLoading(true);
+    
     try {
-      const [profile, gmailStatus] = await Promise.all([
+      const [newProfile, gmailStatus] = await Promise.all([
         api<any>("/settings", { token: session?.access_token }),
         api<any>("/auth/gmail/status", { token: session?.access_token }),
       ]);
 
-      setProfile(profile);
-      setAutoApply(profile.auto_apply_enabled);
-      setDailyLimit(profile.daily_apply_limit);
+      setProfile(newProfile);
       setGmailConnected(gmailStatus.connected);
       setGmailAddress(gmailStatus.gmail_address);
     } catch (error) {
@@ -116,14 +124,6 @@ export default function SettingsPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
@@ -143,43 +143,49 @@ export default function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Connect your Gmail to send job applications through your own email
-              address.
-            </p>
-            <div className="flex items-center gap-3 rounded-lg border p-3">
-              {gmailConnected ? (
-                <>
-                  <CheckCircle className="h-5 w-5 text-success shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Connected</p>
-                    <p className="text-xs text-muted-foreground">
-                      {gmailAddress}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={disconnectGmail}
-                  >
-                    Disconnect
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-5 w-5 text-muted-foreground shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Not connected</p>
-                    <p className="text-xs text-muted-foreground">
-                      Required for auto-apply
-                    </p>
-                  </div>
-                  <Button size="sm" onClick={connectGmail}>
-                    Connect Gmail
-                  </Button>
-                </>
-              )}
-            </div>
+            {loading && !gmailAddress ? (
+              <div className="h-20 animate-pulse bg-muted rounded-lg" />
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Connect your Gmail to send job applications through your own email
+                  address.
+                </p>
+                <div className="flex items-center gap-3 rounded-lg border p-3">
+                  {gmailConnected ? (
+                    <>
+                      <CheckCircle className="h-5 w-5 text-success shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Connected</p>
+                        <p className="text-xs text-muted-foreground">
+                          {gmailAddress}
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={disconnectGmail}
+                      >
+                        Disconnect
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="h-5 w-5 text-muted-foreground shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium">Not connected</p>
+                        <p className="text-xs text-muted-foreground">
+                          Required for auto-apply
+                        </p>
+                      </div>
+                      <Button size="sm" onClick={connectGmail}>
+                        Connect Gmail
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
             <div className="flex items-start gap-2 rounded-lg bg-accent/50 p-3">
               <Shield className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground">
