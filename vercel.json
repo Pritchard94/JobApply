@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build -w shared && npm run build -w client",
+  "buildCommand": "cd client && npm install && npx next build",
   "outputDirectory": "client/.next",
   "installCommand": "npm install"
 }
