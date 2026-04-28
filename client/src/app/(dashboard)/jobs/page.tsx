@@ -36,7 +36,7 @@ interface JobMatch {
   };
 }
 
-export function JobCardSkeleton() {
+function JobCardSkeleton() {
   return (
     <Card className="animate-pulse border-muted">
       <CardContent className="p-5 space-y-4">

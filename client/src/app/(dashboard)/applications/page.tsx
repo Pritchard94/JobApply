@@ -46,7 +46,7 @@ interface Application {
   created_at: string;
 }
 
-export function AppRowSkeleton() {
+function AppRowSkeleton() {
   return (
     <Card className="animate-pulse border-muted">
       <CardContent className="flex items-center gap-4 p-4">
